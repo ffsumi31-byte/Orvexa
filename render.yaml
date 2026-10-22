@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: verdant-3d
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
+      - key: AUTO_REVISE
+        value: "1"
+      - key: MAX_CONCURRENT_BUILDS
+        value: "2"

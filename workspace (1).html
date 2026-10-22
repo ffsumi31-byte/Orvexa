@@ -1,0 +1,592 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Depth 3D workspace</title>
+<style>
+/* Layout: 3D stage with a helper panel beside it on wide screens and below it on phones. */
+:root {
+  --bg: #eef0ec; --panel: #ffffff; --fg: #1c231f; --muted: #66716b; --line: #d6dbd5;
+  --accent: #2f7d55; --accent-fg: #ffffff; --hot: #e0a030;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101412; --panel: #181e1b; --fg: #e4eae6; --muted: #93a09a; --line: #2a332e;
+    --accent: #5cc28c; --accent-fg: #0b130f; --hot: #e8b860; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101412; --panel: #181e1b; --fg: #e4eae6; --muted: #93a09a; --line: #2a332e;
+  --accent: #5cc28c; --accent-fg: #0b130f; --hot: #e8b860; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 12px; padding-bottom: 12px;
+  display: flex; flex-direction: column; gap: 12px; overflow-x: hidden;
+}
+header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn {
+  appearance: none; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  border-radius: 8px; padding: 9px 12px; font: inherit; cursor: pointer; white-space: nowrap; min-height: 40px;
+}
+.btn.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.small { min-height: 34px; padding: 6px 10px; }
+main { display: grid; grid-template-columns: 1fr; gap: 12px; flex: 1; min-height: 0; min-width: 0; }
+@media (min-width: 860px) { main { grid-template-columns: 1fr 300px; } }
+#stage {
+  position: relative; min-height: 420px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--panel); overflow: hidden; min-width: 0; touch-action: none;
+}
+#stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+#stage canvas.grabbing { cursor: grabbing; }
+#mode {
+  position: absolute; left: 10px; top: 10px; font-size: 13px; color: var(--fg);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+  font-variant-numeric: tabular-nums; max-width: calc(100% - 20px); pointer-events: none;
+}
+#addHere {
+  position: absolute; right: 10px; bottom: 10px; font-size: 15px; font-weight: 600;
+}
+aside {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 14px;
+  display: flex; flex-direction: column; gap: 14px; min-width: 0;
+}
+aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+.section { display: flex; flex-direction: column; gap: 8px; }
+.section[hidden] { display: none !important; }
+.row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.axis { display: grid; grid-template-columns: 22px 1fr 68px; gap: 8px; align-items: center; font-variant-numeric: tabular-nums; }
+.axis b { color: var(--muted); font-weight: 600; }
+.axis input[type="range"] { width: 100%; accent-color: var(--accent); }
+.axis input[type="number"] {
+  width: 100%; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 6px;
+}
+.note { color: var(--muted); font-size: 12px; margin: 0; }
+#count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+textarea {
+  width: 100%; min-height: 140px; font: 12px ui-monospace, Menlo, monospace; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; resize: vertical;
+}
+body.embed { padding-top: 8px; padding-bottom: 8px; gap: 8px; }
+body.embed #stage { min-height: 380px; }
+body.embed header h1 { font-size: 15px; }
+.axis input[type=text] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); min-width: 0; }
+kbd { font: 600 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--bg); color: var(--fg); }
+</style>
+
+<header>
+  <h1>Depth 3D <small style="font-weight:500;color:var(--muted)">low-poly workspace</small></h1>
+  <div class="tools" role="toolbar" aria-label="Tools">
+    <button class="btn" id="bCube" type="button">+ Cube <kbd>C</kbd></button>
+    <button class="btn" id="bPoint" type="button">+ Point <kbd>P</kbd></button>
+    <button class="btn" id="bDel" type="button">Delete <kbd>Del</kbd></button>
+    <button class="btn" id="bExport" type="button">Export OBJ</button>
+    <button class="btn" id="bJson" type="button">Export JSON</button>
+    <button class="btn" id="bLoad" type="button">Load JSON</button>
+  </div>
+</header>
+
+<main>
+  <div id="stage">
+    <div id="mode">Drag to orbit. Click a part to select it. Drag a selected part to move it.</div>
+    <button class="btn" id="addHere" type="button" hidden>+ Point here</button>
+  </div>
+
+  <aside aria-label="Editing helpers">
+    <div class="section" id="partSec" hidden>
+      <h2>Part</h2>
+      <div class="axis"><b>Aa</b><input type="text" id="pname" maxlength="40" aria-label="Part name" style="grid-column:2 / -1"></div>
+      <div class="axis"><b>◐</b><input type="color" id="pcol" aria-label="Part color" style="grid-column:2 / -1;width:100%;height:34px;padding:2px"></div>
+      <div class="axis"><b>X</b><input type="range" id="sx" min="0.2" max="4" step="0.05" value="1"><input type="number" id="sxN" step="0.05" min="0.1"></div>
+      <div class="axis"><b>Y</b><input type="range" id="sy" min="0.2" max="4" step="0.05" value="1"><input type="number" id="syN" step="0.05" min="0.1"></div>
+      <div class="axis"><b>Z</b><input type="range" id="sz" min="0.2" max="4" step="0.05" value="1"><input type="number" id="szN" step="0.05" min="0.1"></div>
+      <div class="row">
+        <button class="btn small" id="uniform" type="button">Lock all axes: off</button>
+        <button class="btn small" id="resetScale" type="button">Reset size</button>
+      </div>
+      <p class="note">Drag the selected part on the ground to move it. Hold Shift and drag to raise or lower it.</p>
+    </div>
+
+    <div class="section" id="ptSec" hidden>
+      <h2>Selected point</h2>
+      <p class="note" id="ptInfo"></p>
+      <div class="axis"><b>X</b><input type="range" id="px" min="-4" max="4" step="0.05" value="0"><input type="number" id="pxN" step="0.05"></div>
+      <div class="axis"><b>Y</b><input type="range" id="py" min="-4" max="4" step="0.05" value="0"><input type="number" id="pyN" step="0.05"></div>
+      <div class="axis"><b>Z</b><input type="range" id="pz" min="-4" max="4" step="0.05" value="0"><input type="number" id="pzN" step="0.05"></div>
+      <div class="row"><button class="btn small" id="ptRemove" type="button">Remove point</button></div>
+    </div>
+
+    <div class="section">
+      <h2>Model</h2>
+      <div id="count">0 parts · 0 tris</div>
+      <p class="note">Each part is the convex hull of its points, so it stays low poly and flat shaded. Drag empty space to orbit, right-drag to pan, scroll to zoom.</p>
+    </div>
+
+    <div class="section" id="outSec" hidden>
+      <h2>Export / import text</h2>
+      <textarea id="out" aria-label="Export or import text"></textarea>
+      <div class="row"><button class="btn small" id="bApply" type="button">Load this JSON</button></div>
+      <p class="note">Copy this text to save it as a .obj or .json file. To import, paste a Depth 3D JSON here and press Load.</p>
+    </div>
+  </aside>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/ConvexHull.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/ConvexGeometry.js"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const stage = $('stage');
+  const modeEl = $('mode');
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const canvas = renderer.domElement;
+  stage.insertBefore(canvas, modeEl);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf3f8f4);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+  camera.position.set(5, 5, 7);
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.target.set(0, 1, 0);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x6f7d73, 1.15));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.05);
+  sun.position.set(5, 10, 6);
+  scene.add(sun);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0xf5f8f5, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+  scene.add(new THREE.GridHelper(60, 60, 0x8ca695, 0xd2ddd5));
+
+  const parts = [];      // { group, points: [Vector3 local], mesh, pointMeshes: [] }
+  let selected = null;
+  let selPoint = -1;
+  const mouse = new THREE.Vector2();
+  const ray = new THREE.Raycaster();
+  const UP = new THREE.Vector3(0, 1, 0);
+  const groundPlane = new THREE.Plane(UP, 0);
+
+  // Drag state. A press that moves less than 5px is a click; anything more is a drag.
+  let press = null;      // { x, y, moved, kind: 'part'|'point'|null, offset, plane, startY }
+
+  const ghost = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: 0x2f7d55, transparent: true, opacity: 0.8, depthTest: false }));
+  ghost.visible = false; ghost.renderOrder = 10;
+  scene.add(ghost);
+
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(stage);
+  resize();
+  (function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+
+  const DEFAULT_COLOR = '#5f9a78';
+  const matCache = new Map();
+  function partMat(color, sel) {
+    const k = color + (sel ? '*' : '');
+    if (!matCache.has(k)) {
+      const c = new THREE.Color(color);
+      matCache.set(k, sel
+        ? new THREE.MeshStandardMaterial({ color: c.clone().lerp(new THREE.Color(0xffffff), 0.3), flatShading: true, roughness: 0.9, emissive: c.clone().multiplyScalar(0.2) })
+        : new THREE.MeshStandardMaterial({ color: c, flatShading: true, roughness: 0.9 }));
+    }
+    return matCache.get(k);
+  }
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xe0a030, depthTest: false });
+  const dotSelMat = new THREE.MeshBasicMaterial({ color: 0xff5a2a, depthTest: false });
+  const dotGeo = new THREE.SphereGeometry(0.1, 8, 6);
+
+  function rebuild(p) {
+    if (p.mesh) { p.group.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh = null; }
+    p.pointMeshes.forEach(m => p.group.remove(m));
+    p.pointMeshes = [];
+    if (p.points.length >= 4) {
+      try {
+        const geo = new THREE.ConvexGeometry(p.points);
+        p.mesh = new THREE.Mesh(geo, partMat(p.color || DEFAULT_COLOR, p === selected));
+        p.mesh.userData.part = p;
+        p.group.add(p.mesh);
+      } catch (e) { p.mesh = null; }
+    }
+    if (p === selected) {
+      p.pointMeshes = p.points.map((v, i) => {
+        const m = new THREE.Mesh(dotGeo, i === selPoint ? dotSelMat : dotMat);
+        m.position.copy(v); m.renderOrder = 5;
+        m.userData.point = { part: p, index: i };
+        p.group.add(m);
+        return m;
+      });
+    }
+    updateCount();
+  }
+
+  function updateCount() {
+    markDirty();
+    let tris = 0;
+    parts.forEach(p => { if (p.mesh) tris += p.mesh.geometry.attributes.position.count / 3; });
+    $('count').textContent = parts.length + ' parts · ' + Math.round(tris) + ' tris';
+  }
+
+  // ---- model <-> JSON, and the bridge to the Verdant page ----
+  const inFrame = window.parent !== window;
+  if (inFrame) { document.documentElement.dataset.theme = 'light'; document.body.classList.add('embed'); }
+  function post(msg) { if (inFrame) window.parent.postMessage(Object.assign({ source: 'verdant-lowpoly' }, msg), '*'); }
+  let dirtyT = 0;
+  function markDirty() { clearTimeout(dirtyT); dirtyT = setTimeout(() => { let t = 0; parts.forEach(p => { if (p.mesh) t += p.mesh.geometry.attributes.position.count / 3; }); post({ type: 'lp:changed', parts: parts.length, tris: Math.round(t), model: serialize() }); }, 350); }
+  const r3 = n => Math.round(n * 1000) / 1000;
+  function serialize() {
+    return {
+      format: 'verdant-lowpoly', version: 1, title: modelTitle,
+      parts: parts.map((p, i) => ({
+        id: p.name || ('part_' + (i + 1)), color: p.color || DEFAULT_COLOR,
+        pos: [r3(p.group.position.x), r3(p.group.position.y), r3(p.group.position.z)],
+        scale: [r3(p.group.scale.x), r3(p.group.scale.y), r3(p.group.scale.z)],
+        points: p.points.map(v => [r3(v.x), r3(v.y), r3(v.z)])
+      }))
+    };
+  }
+  let modelTitle = 'Untitled';
+  function clearModel() {
+    parts.forEach(p => { scene.remove(p.group); if (p.mesh) p.mesh.geometry.dispose(); });
+    parts.length = 0; selected = null; selPoint = -1;
+  }
+  function frameModel() {
+    const box = new THREE.Box3(); const v = new THREE.Vector3();
+    parts.forEach(p => { p.group.updateMatrixWorld(true); p.points.forEach(pt => box.expandByPoint(v.copy(pt).applyMatrix4(p.group.matrixWorld))); });
+    if (box.isEmpty()) return;
+    const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+    const d = Math.max(size.x, size.y, size.z, 1) * 1.42 + 1.0;
+    controls.target.copy(c);
+    camera.position.set(c.x + d * 0.62, c.y + d * 0.42, c.z + d * 0.78);
+    controls.update();
+  }
+  function loadModel(m, keepView) {
+    if (!m || !Array.isArray(m.parts)) throw new Error('This is not a Depth 3D model.');
+    clearModel();
+    modelTitle = String(m.title || 'Untitled').slice(0, 80);
+    m.parts.forEach((d, i) => {
+      const pts = (d.points || []).filter(a => Array.isArray(a) && a.length === 3 && a.every(Number.isFinite)).map(a => new THREE.Vector3(a[0], a[1], a[2]));
+      if (pts.length < 4) return;
+      const g = new THREE.Group(); scene.add(g);
+      const pos = d.pos || [0, 0, 0], sc = d.scale || [1, 1, 1];
+      g.position.set(+pos[0] || 0, +pos[1] || 0, +pos[2] || 0);
+      g.scale.set(+sc[0] || 1, +sc[1] || 1, +sc[2] || 1);
+      const color = /^#[0-9a-f]{6}$/i.test(d.color || '') ? d.color : DEFAULT_COLOR;
+      const p = { group: g, points: pts, mesh: null, pointMeshes: [], color, name: String(d.id || ('part_' + (i + 1))).slice(0, 40) };
+      parts.push(p); rebuild(p);
+    });
+    select(null); updateCount();
+    if (!keepView) frameModel();
+    modeEl.textContent = modelTitle + ' loaded (' + parts.length + ' parts). Click a part to select it.';
+  }
+  window.addEventListener('message', e => {
+    if (e.source !== window.parent) return;
+    const d = e.data || {};
+    try {
+      if (d.type === 'lp:load') loadModel(d.model, d.keepView);
+      else if (d.type === 'lp:get') post({ type: 'lp:model', id: d.id, model: serialize() });
+      else if (d.type === 'lp:clear') { clearModel(); select(null); updateCount(); }
+    } catch (err) { post({ type: 'lp:error', message: String(err.message || err) }); }
+  });
+
+  function select(p) {
+    const prev = selected;
+    selected = p || null;
+    selPoint = -1;
+    if (prev) rebuild(prev);
+    if (selected) rebuild(selected);
+    syncPanels();
+    modeEl.classList.remove('on');
+    modeEl.textContent = selected
+      ? 'Selected part (' + selected.points.length + ' points). Drag it to move, or click an orange dot to edit a point.'
+      : 'Drag to orbit. Click a part to select it.';
+  }
+
+  function addCube(at) {
+    const g = new THREE.Group();
+    scene.add(g);
+    const h = 0.5;
+    const pts = [];
+    for (const x of [-h, h]) for (const y of [-h, h]) for (const z of [-h, h]) pts.push(new THREE.Vector3(x, y, z));
+    g.position.set(at ? at.x : 0, h, at ? at.z : 0);
+    const p = { group: g, points: pts, mesh: null, pointMeshes: [], color: DEFAULT_COLOR, name: 'part_' + (parts.length + 1) };
+    parts.push(p);
+    select(p);
+    rebuild(p);
+  }
+
+  function setMouse(e) {
+    const r = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+    mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(mouse, camera);
+  }
+
+  function groundHit() {
+    const t = new THREE.Vector3();
+    return ray.ray.intersectPlane(groundPlane, t) ? t : null;
+  }
+
+  function surfaceHit() {
+    const meshes = parts.filter(p => p.mesh).map(p => p.mesh);
+    const hits = ray.intersectObjects(meshes, false);
+    if (hits.length) {
+      const h = hits[0];
+      return { point: h.point.clone(), normal: h.face.normal.clone().transformDirection(h.object.matrixWorld) };
+    }
+    const g = groundHit();
+    return g ? { point: g, normal: UP.clone() } : null;
+  }
+
+  function targetFor(h) { return h.point.clone().add(h.normal.clone().multiplyScalar(0.15)); }
+
+  function addPointAtGhost() {
+    if (!selected) { modeEl.textContent = 'Select a part first.'; return; }
+    const h = surfaceHit();
+    if (!h) return;
+    selected.points.push(selected.group.worldToLocal(targetFor(h)));
+    selPoint = selected.points.length - 1;
+    rebuild(selected);
+    syncPanels();
+    modeEl.textContent = 'Point added. Drag it or use the sliders.';
+  }
+
+  function removePoint(p, i) {
+    if (!p || i < 0) return;
+    if (p.points.length <= 4) { modeEl.textContent = 'A part needs at least 4 points.'; return; }
+    p.points.splice(i, 1);
+    selPoint = -1;
+    rebuild(p);
+    syncPanels();
+  }
+
+  function deleteSelected() {
+    if (!selected) return;
+    scene.remove(selected.group);
+    parts.splice(parts.indexOf(selected), 1);
+    selected = null; selPoint = -1;
+    syncPanels(); updateCount();
+    modeEl.textContent = 'Deleted.';
+  }
+
+  // ---- panels ----
+  function bindPair(rangeId, numId, set, min, max) {
+    const r = $(rangeId), n = $(numId);
+    const apply = v => {
+      v = parseFloat(v);
+      if (isNaN(v)) return;
+      set(Math.max(min, Math.min(max, v)));
+    };
+    r.addEventListener('input', () => apply(r.value));
+    n.addEventListener('change', () => apply(n.value));
+  }
+  let locked = false;
+  $('uniform').onclick = () => {
+    locked = !locked;
+    $('uniform').textContent = 'Lock all axes: ' + (locked ? 'on' : 'off');
+    $('uniform').classList.toggle('on', locked);
+  };
+  function setScale(axis, v) {
+    if (!selected) return;
+    const s = selected.group.scale;
+    if (locked) s.set(v, v, v); else s[axis] = v;
+    syncScale(); markDirty();
+  }
+  function syncScale() {
+    if (!selected) return;
+    const s = selected.group.scale;
+    [['sx', 'sxN', s.x], ['sy', 'syN', s.y], ['sz', 'szN', s.z]].forEach(([r, n, v]) => {
+      $(r).value = Math.max(0.2, Math.min(4, v)); $(n).value = v.toFixed(2);
+    });
+  }
+  bindPair('sx', 'sxN', v => setScale('x', v), 0.2, 4);
+  bindPair('sy', 'syN', v => setScale('y', v), 0.2, 4);
+  bindPair('sz', 'szN', v => setScale('z', v), 0.2, 4);
+  $('resetScale').onclick = () => { if (selected) { selected.group.scale.set(1, 1, 1); syncScale(); markDirty(); } };
+
+  function setPt(axis, v) {
+    if (!selected || selPoint < 0) return;
+    selected.points[selPoint][axis] = v;
+    rebuild(selected);
+    syncPoint();
+  }
+  function syncPoint() {
+    const has = selected && selPoint >= 0;
+    if (!has) return;
+    $('ptInfo').textContent = 'Point ' + (selPoint + 1) + ' of ' + selected.points.length + '. Drag its dot in the scene, or type a value.';
+    const v = selected.points[selPoint];
+    [['px', 'pxN', 'x'], ['py', 'pyN', 'y'], ['pz', 'pzN', 'z']].forEach(([r, n, a]) => {
+      $(r).value = Math.max(-4, Math.min(4, v[a])); $(n).value = v[a].toFixed(2);
+    });
+  }
+  bindPair('px', 'pxN', v => setPt('x', v), -4, 4);
+  bindPair('py', 'pyN', v => setPt('y', v), -4, 4);
+  bindPair('pz', 'pzN', v => setPt('z', v), -4, 4);
+  $('ptRemove').onclick = () => removePoint(selected, selPoint);
+  $('pcol').addEventListener('input', () => { if (selected) { selected.color = $('pcol').value; rebuild(selected); } });
+  $('pname').addEventListener('change', () => { if (selected) { selected.name = $('pname').value.trim().slice(0, 40) || selected.name; markDirty(); } });
+
+  function syncPanels() {
+    $('partSec').hidden = !selected;
+    $('ptSec').hidden = !(selected && selPoint >= 0);
+    $('addHere').hidden = !selected;
+    if (selected) { syncScale(); $('pname').value = selected.name || ''; $('pcol').value = selected.color || DEFAULT_COLOR; }
+    syncPoint();
+  }
+
+  // ---- pointer: orbit by default, drag the selected part or point, click to select ----
+  canvas.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    setMouse(e);
+    press = { x: e.clientX, y: e.clientY, moved: false, kind: null };
+    if (selected) {
+      // a dot on the selected part: drag the point
+      const dh = ray.intersectObjects(selected.pointMeshes, false);
+      if (dh.length) {
+        selPoint = dh[0].object.userData.point.index;
+        press.kind = 'point';
+        press.plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+          camera.getWorldDirection(new THREE.Vector3()).negate(),
+          selected.group.localToWorld(selected.points[selPoint].clone()));
+        rebuild(selected);
+        syncPanels();
+        controls.enabled = false;
+        return;
+      }
+      // the selected part itself: drag to move on the ground
+      const mh = selected.mesh ? ray.intersectObject(selected.mesh, false) : [];
+      if (mh.length) {
+        press.kind = 'part';
+        const g = groundHit();
+        press.offset = g ? g.clone().sub(new THREE.Vector3(selected.group.position.x, 0, selected.group.position.z)) : new THREE.Vector3();
+        press.startY = selected.group.position.y;
+        controls.enabled = false;
+        canvas.classList.add('grabbing');
+      }
+    }
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    setMouse(e);
+    if (press && !press.moved && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 5) press.moved = true;
+
+    if (press && press.moved && press.kind === 'part' && selected) {
+      if (e.shiftKey) {
+        selected.group.position.y = Math.max(0, press.startY - (e.clientY - press.y) * 0.02);
+      } else {
+        const g = groundHit();
+        if (g) {
+          selected.group.position.x = g.x - press.offset.x;
+          selected.group.position.z = g.z - press.offset.z;
+        }
+      }
+      return;
+    }
+    if (press && press.moved && press.kind === 'point' && selected) {
+      const t = new THREE.Vector3();
+      if (ray.ray.intersectPlane(press.plane, t)) {
+        selected.points[selPoint].copy(selected.group.worldToLocal(t));
+        rebuild(selected);
+        syncPoint();
+      }
+      return;
+    }
+
+    // hover: ghost marker for where a new point will land
+    if (!press && selected) {
+      const h = surfaceHit();
+      if (h) { ghost.visible = true; ghost.position.copy(targetFor(h)); } else ghost.visible = false;
+    }
+  });
+
+  function endPress() {
+    if (!press) return;
+    const wasClick = !press.moved;
+    controls.enabled = true;
+    canvas.classList.remove('grabbing');
+    if (wasClick && press.kind === null) {
+      // click on empty space or a different part: select or deselect
+      const meshes = parts.filter(p => p.mesh).map(p => p.mesh);
+      const hs = ray.intersectObjects(meshes, false);
+      if (hs.length) select(hs[0].object.userData.part);
+      else select(null);
+    } else if (wasClick && press.kind === 'point') {
+      modeEl.textContent = 'Point ' + (selPoint + 1) + ' selected.';
+    } else if (press.kind === 'part' && press.moved) {
+      modeEl.textContent = 'Moved. Hold Shift and drag to raise or lower it.';
+    }
+    if (wasPartMove(press)) markDirty();
+    press = null;
+  }
+  function wasPartMove(pr) { return pr && pr.kind === 'part' && pr.moved; }
+  canvas.addEventListener('pointerup', endPress);
+  canvas.addEventListener('pointercancel', endPress);
+  canvas.addEventListener('pointerleave', () => { ghost.visible = false; });
+
+  // ---- buttons and keys ----
+  $('bCube').onclick = () => { const h = surfaceHit(); addCube(h ? h.point : null); };
+  $('bPoint').onclick = addPointAtGhost;
+  $('addHere').onclick = addPointAtGhost;
+  $('bDel').onclick = deleteSelected;
+
+  $('bExport').onclick = () => {
+    let out = '# Low poly export\n';
+    let base = 0;
+    parts.forEach((p, i) => {
+      if (!p.mesh) return;
+      const pos = p.mesh.geometry.attributes.position;
+      out += 'o ' + (p.name || ('part_' + (i + 1))).replace(/\s+/g, '_') + '\n# color ' + (p.color || DEFAULT_COLOR) + '\n';
+      const m = p.group.matrixWorld;
+      const v = new THREE.Vector3();
+      for (let k = 0; k < pos.count; k++) {
+        v.fromBufferAttribute(pos, k).applyMatrix4(m);
+        out += 'v ' + v.x.toFixed(3) + ' ' + v.y.toFixed(3) + ' ' + v.z.toFixed(3) + '\n';
+      }
+      for (let k = 0; k < pos.count; k += 3) out += 'f ' + (base + k + 1) + ' ' + (base + k + 2) + ' ' + (base + k + 3) + '\n';
+      base += pos.count;
+    });
+    $('out').value = out;
+    $('outSec').hidden = false;
+    $('out').focus(); $('out').select();
+  };
+  $('bJson').onclick = () => {
+    $('out').value = JSON.stringify(serialize(), null, 1);
+    $('outSec').hidden = false; $('out').focus(); $('out').select();
+  };
+  $('bLoad').onclick = () => {
+    $('out').value = ''; $('outSec').hidden = false; $('out').focus();
+    modeEl.textContent = 'Paste a Depth 3D JSON into the text box, then press "Load this JSON".';
+  };
+  $('bApply').onclick = () => {
+    try { loadModel(JSON.parse($('out').value)); }
+    catch (err) { modeEl.textContent = 'Could not load: ' + (err.message || 'invalid JSON'); }
+  };
+
+  window.addEventListener('keydown', e => {
+    if (e.target && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT')) return;
+    const k = e.key.toLowerCase();
+    if (k === 'c') $('bCube').click();
+    else if (k === 'p') addPointAtGhost();
+    else if (k === 'delete' || k === 'backspace') deleteSelected();
+    else if (k === 'escape') select(null);
+  });
+  post({ type: 'lp:ready' });
+})();
+</script>
+
+</body></html>
